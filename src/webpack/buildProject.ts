@@ -1,12 +1,12 @@
-const { getWebpackConfig, getProjectRoot } = require("./index");
-const WebpackOptionsCheck = require("webpack/schemas/WebpackOptions.check");
-const { ConfigPrinter, logBuildAssets } = require("../utils/print");
 const fs = require("fs");
-const path = require("path");
-const webpack = require("webpack");
-const chalk = require("chalk");
 const ora = require("ora");
-import type { Configuration, Compiler, Stats, StatsError } from "webpack";
+const path = require("path");
+const chalk = require("chalk");
+const webpack = require("webpack");
+const { getWebpackConfig, getProjectRoot } = require("./index");
+const { ConfigPrinter, logBuildAssets } = require("../utils/print");
+const { resolveConfigPath, validateConfig } = require("./utils");
+import type { Configuration, Stats, StatsError } from "webpack";
 
 interface BuildOptions {
   config?: string; // 配置文件路径
@@ -22,7 +22,6 @@ async function buildProject(options: BuildOptions) {
     mode: "production",
     configPath,
   });
-
   // 3. 验证配置
   validateConfig(config);
   // 4. 打印配置（调试模式下）
@@ -34,23 +33,6 @@ async function buildProject(options: BuildOptions) {
   }
   // 5. 执行构建
   await runBuild(config);
-}
-
-function resolveConfigPath(customPath?: string): string {
-  const defaultPath = path.resolve(process.cwd(), "config.js");
-  const configPath = customPath ? path.resolve(process.cwd(), customPath) : defaultPath;
-
-  if (!fs.existsSync(configPath)) {
-    throw new Error(`配置文件不存在: ${configPath}`);
-  }
-
-  return configPath;
-}
-
-function validateConfig(config: Configuration): void {
-  if (!WebpackOptionsCheck(config)) {
-    throw new Error("Webpack配置验证失败");
-  }
 }
 
 function runBuild(config: Configuration): Promise<void> {
@@ -82,7 +64,6 @@ function runBuild(config: Configuration): Promise<void> {
         reject(new Error("没有生成构建统计信息"));
         return;
       }
-
       // 处理构建结果
       handleBuildResult(stats);
       // 检查构建是否有错误
@@ -90,7 +71,6 @@ function runBuild(config: Configuration): Promise<void> {
         reject(new Error("构建过程中发生错误"));
         return;
       }
-
       const endTime = Date.now();
       // 添加完成动画和信息
       console.log("\n" + chalk.green("✨ 构建成功！"), chalk.cyan("⏱️  构建用时：") + chalk.yellow(`${(endTime - startTime) / 1000}s`));
@@ -126,10 +106,8 @@ function handleBuildResult(stats: Stats): void {
       console.log(chalk.red(error.message || error));
     });
   }
-
   // 输出构建统计信息
   console.log(statsOutput);
-
   // 输出构建资源信息
   const info = stats.toJson({
     assets: true,

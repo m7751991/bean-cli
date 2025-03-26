@@ -3,38 +3,26 @@ const path = require("path");
 const { mergeWithRules } = require("webpack-merge");
 import type { Configuration } from "webpack";
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const WebpackOptionsCheck = require("webpack/schemas/WebpackOptions.check");
 import type { ProjectConfig } from "../types/types";
 
 class ConfigManager {
   static async getProjectConfig(configPath?: string): Promise<ProjectConfig> {
-    const defaultConfig: ProjectConfig = {
-      baseConfig: {
-        entry: "",
-      },
-      webpackConfig: {},
-      devServerConfig: {},
-    };
-
-    try {
-      if (!configPath) {
-        return defaultConfig;
-      }
-
-      const configFullPath = path.resolve(process.cwd(), configPath);
-      if (!fs.existsSync(configFullPath)) {
-        return defaultConfig;
-      }
-
-      const config = require(configFullPath);
-      return {
-        baseConfig: config.baseConfig || {},
-        webpackConfig: config.webpackConfig || {},
-        devServerConfig: config.devServerConfig || {},
-      };
-    } catch (error) {
-      console.error("Failed to load project config:", error);
-      return defaultConfig;
+    if (!configPath) {
+      throw new Error("没有配置文件路径");
     }
+
+    const configFullPath = path.resolve(process.cwd(), configPath);
+    if (!fs.existsSync(configFullPath)) {
+      throw new Error("配置文件不存在");
+    }
+
+    const config = require(configFullPath);
+    return {
+      baseConfig: config.baseConfig || {},
+      webpackConfig: config.webpackConfig || {},
+      devServerConfig: config.devServerConfig || {},
+    };
   }
 
   static mergeWebpackConfig(baseConfig: Configuration, customConfig: Configuration): Configuration {
@@ -75,9 +63,7 @@ class ConfigManager {
 
 function getStyleLoaders(preprocessor?: "less" | "sass") {
   const loaders: any[] = [
-    {
-      loader: "vue-style-loader",
-    },
+    process.env.NODE_ENV === "production" ? MiniCssExtractPlugin.loader : "vue-style-loader",
     {
       loader: "css-loader",
       options: {
@@ -114,7 +100,25 @@ function getStyleLoaders(preprocessor?: "less" | "sass") {
   return loaders;
 }
 
+function resolveConfigPath(customPath?: string): string {
+  const defaultPath = path.resolve(process.cwd(), "config.js");
+  const configPath = customPath ? path.resolve(process.cwd(), customPath) : defaultPath;
+
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`配置文件不存在: ${configPath}`);
+  }
+
+  return configPath;
+}
+
+function validateConfig(config: Configuration): void {
+  if (!WebpackOptionsCheck(config)) {
+    throw new Error("Webpack配置验证失败");
+  }
+}
 module.exports = {
   ConfigManager,
   getStyleLoaders,
+  resolveConfigPath,
+  validateConfig,
 };
